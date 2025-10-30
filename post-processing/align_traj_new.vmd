@@ -1,0 +1,22 @@
+#/Applications/VMD\ 1.9.4a57-arm64-Rev12.app/Contents/MacOS/startup.command -dispdev text step3_input.psf step5_production01.dcd -e align_traj.vmd -args test_tcl.dcd
+load /Applications/qwrap.so.1.6
+# define function align_through_time
+proc align_through_time {{mol top}} {
+set reference [atomselect $mol "protein" frame 0]
+set compare [atomselect $mol "protein"]
+set num_steps [molinfo $mol get numframes]
+for {set frame 0} {$frame < $num_steps} {incr frame} {
+$compare frame $frame
+set trans_mat [measure fit $compare $reference]
+$compare move $trans_mat
+}
+}
+#
+set traj [lindex $argv 0] 
+set trajname $traj 
+molinfo 0 get numframes
+qunwrap sel protein 
+qwrap sel "not protein" center protein
+align_through_time
+animate write dcd $trajname
+quit

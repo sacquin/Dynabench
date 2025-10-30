@@ -1,0 +1,44 @@
+#!/usr/bin/tcsh
+###
+# This tcsh scripts treats all the entries of a AA directory that contains "new_xxxx.tgz"
+#  files relative to the complex with PDB id XXXX of the AA (antibody-antigen) functional 
+#  family, obtained after treatment of the charmm-gui outputs by 'prep.sh' 
+#  (see "Preparation simulation files" directory)
+#
+# For each replica of each complex: 
+# - concatenates trajectory parts 
+# - produces a pdb file without water molecules and stores it in the LITE_DRY directory
+# - produces a trajectory without water centered in the box and aligned on the starting .pdb and stores it in the LITE_DRY directory
+###
+foreach fa ( AA ) 
+if(! (-e LITE_DRY/$fa)) mkdir LITE_DRY/$fa
+foreach cplx (${fa}/*)
+if(! (-e LITE_DRY/${fa}/$cplx:t )) mkdir LITE_DRY/${fa}/$cplx:t
+#
+echo ''
+echo "### [" $fa "]  " $cplx:t " ###"
+echo ''
+#
+# dry input.pdb and add chain name 
+echo "... drying ${fa}/${cplx:t}/namd/step3_input.pdb, adding chain and copying to LITE_DRY/${fa}/${cplx:t}/${cplx:t}_input.pdb"
+awk 'BEGIN {l=1}; /TER/ {l++}; $0 !~ /TIP3/ && $0 !~ /CLA/ && $0 !~ /SOD/ && $0 != "END" && $0 != "TER" {print NR-l}' ${fa}/${cplx:t}/namd/step3_input.pdb > ! index.txt
+awk '$0 !~ /TIP3/ && $0 !~ /CLA/ && $0 !~ /SOD/ {s = substr($0,76,1); printf "%s%s%s\n", substr($0,1,21),s,substr($0,23)}' ${fa}/${cplx:t}/namd/step3_input.pdb > ! LITE_DRY/${fa}/${cplx:t}/${cplx:t}_input.pdb
+#
+foreach i (0 1 2)   # loop over three replicas
+set j = $i
+@ j++
+## FIRST align THEN dry : qwrap requires psf
+echo "... concatenating, wrapping and aligning, on ${fa}/${cplx:t}/namd/step3_input.psf, production run for replica " $j " --->  LITE_DRY/${fa}/${cplx:t}/aligned_production${j}.dcd "
+catdcd -o LITE_DRY/${fa}/${cplx:t}/tmp_production${j}.dcd ${fa}/${cplx:t}/namd/step5_production${i}?.dcd > LOG/${fa}_${cplx:t}_prod_$j.log
+# the path in the command below needs to be adapted  
+/Applications/VMD\ 1.9.4a57-arm64-Rev12.app/Contents/MacOS/startup.command -dispdev text ${fa}/${cplx:t}/namd/step3_input.psf LITE_DRY/${fa}/${cplx:t}/tmp_production${j}.dcd -e align_traj_new.vmd -args LITE_DRY/${fa}/${cplx:t}/wet_production${j}.dcd
+#
+echo "... drying production run for replica " $j " --->  LITE_DRY/${fa}/${cplx:t}/production${j}.dcd "
+catdcd -i index.txt -o LITE_DRY/${fa}/${cplx:t}/production$j.dcd  LITE_DRY/${fa}/${cplx:t}/wet_production${j}.dcd 
+#
+echo "... cleaning temporary dcd files wet_production$j.dcd tmp_production$j.dcd  "
+\rm LITE_DRY/${fa}/${cplx:t}/{wet_production${j}.dcd,tmp_production${j}.dcd}
+end
+end
+end
+
