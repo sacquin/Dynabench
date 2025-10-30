@@ -1,3 +1,7 @@
+#!/usr/bin/env tsch
+
+echo "This is a sample tsch script."
+
 foreach ff (*.tgz)
 set cust = $ff:r
 echo "...processing " $cust "..."
